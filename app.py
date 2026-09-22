@@ -15,11 +15,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Data Viewer - Full Data with Search</title>
+    <title>HR Data Viewer - Full Filter System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .table-container {
-            max-height: 70vh;
+            max-height: 65vh;
             overflow: auto;
             border: 1px solid #dee2e6;
         }
@@ -34,19 +34,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .table td {
             white-space: nowrap;
         }
+        .filter-card {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+        }
     </style>
 </head>
 <body class="bg-light">
     <div class="container-fluid px-4 py-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="text-primary fw-bold mb-0">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="text-primary fw-bold mb-0">📊 ระบบแสดงผลและกรองข้อมูลพนักงาน (HR Data Viewer)</h2>
             {% if tables %}
                 <a href="/" class="btn btn-outline-danger">🗑️ ล้างข้อมูล / อัปโหลดใหม่</a>
             {% endif %}
         </div>
         
-        <div class="card mb-4 shadow-sm">
-            <div class="card-body">
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body py-3">
                 <form method="POST" enctype="multipart/form-data" class="row g-3 align-items-center">
                     <div class="col-md-9">
                         <input type="file" name="file" class="form-control" accept=".txt,.csv" required>
@@ -69,19 +73,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {% endif %}
 
         {% if tables %}
-            <!-- ช่องค้นหาข้อมูลแบบ Instant Search -->
-            <div class="card mb-3 shadow-sm border-primary">
-                <div class="card-body bg-light py-2">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <div class="input-group">
-                                <span class="input-group-text bg-primary text-white fw-bold">🔍 ค้นหาข้อมูล</span>
-                                <input type="text" id="searchInput" class="form-control" placeholder="พิมพ์ค้นด้วยอะไรก็ได้ (ชื่อ, ID, ตำแหน่ง, แผนก, ที่อยู่ ฯลฯ)...">
-                                <button class="btn btn-outline-secondary" type="button" id="clearSearch">ล้างคำค้น</button>
-                            </div>
+            <!-- แผงค้นหาและตัวกรองข้อมูล -->
+            <div class="card mb-3 shadow-sm filter-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark mb-0">🎯 ระบบค้นหาและตัวกรองข้อมูล (Filter)</h5>
+                        <div class="d-flex align-items-center gap-3">
+                            <span id="rowCountInfo" class="badge bg-primary fs-6 fw-normal">กำลังคำนวณ...</span>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" id="resetFiltersBtn">🔄 ล้างตัวกรองทั้งหมด</button>
                         </div>
-                        <div class="col-md-4 text-end text-muted small">
-                            ⚡ กรองข้อมูล Real-time ทุกคอลัมน์
+                    </div>
+
+                    <!-- ช่องค้นหาคำรวม -->
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark text-white">🔍 ค้นหารวมทุกคอลัมน์</span>
+                            <input type="text" id="searchInput" class="form-control" placeholder="พิมพ์คำที่ต้องการค้นหาทั่วทั้งตาราง...">
+                        </div>
+                    </div>
+
+                    <!-- พื้นที่สร้างตัวกรองแยกตามคอลัมน์อัตโนมัติ -->
+                    <div class="border-top pt-3">
+                        <div class="fw-bold small text-muted mb-2">⚙️ ตัวกรองแยกตามคอลัมน์ (Filter by Column):</div>
+                        <div id="dynamicFilters" class="row g-2">
+                            <!-- JS จะสร้าง Dropdown / Input ของแต่ละคอลัมน์ให้ที่นี่ -->
                         </div>
                     </div>
                 </div>
@@ -105,44 +120,175 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         {% endif %}
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.getElementById('searchInput');
-            const clearBtn = document.getElementById('clearSearch');
+            const resetBtn = document.getElementById('resetFiltersBtn');
+            const dynamicFiltersContainer = document.getElementById('dynamicFilters');
 
-            function filterTable() {
-                if (!searchInput) return;
-                const filter = searchInput.value.toLowerCase().trim();
+            // ฟังก์ชันสร้าง Dropdown/Input ตัวกรองตามคอลัมน์ของแท็บที่กำลังเปิดอยู่
+            function buildColumnFilters() {
+                if (!dynamicFiltersContainer) return;
+                dynamicFiltersContainer.innerHTML = '';
+
                 const activeTab = document.querySelector('.tab-pane.active');
                 if (!activeTab) return;
 
-                const rows = activeTab.querySelectorAll('tbody tr');
+                const table = activeTab.querySelector('table');
+                if (!table) return;
+
+                const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return;
+
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+
+                headers.forEach((header, colIndex) => {
+                    // ดึงค่าทั้งหมดในคอลัมน์นั้นๆ เพื่อหา Unique Values
+                    const uniqueValues = new Set();
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells[colIndex]) {
+                            const val = cells[colIndex].textContent.trim();
+                            if (val !== '') uniqueValues.add(val);
+                        }
+                    });
+
+                    const sortedVals = Array.from(uniqueValues).sort((a, b) => a.localeCompare(b, 'th'));
+
+                    const colDiv = document.createElement('div');
+                    colDiv.className = 'col-md-3 col-sm-6';
+
+                    const label = document.createElement('label');
+                    label.className = 'form-label small fw-bold text-truncate w-100 mb-1';
+                    label.title = header;
+                    label.textContent = header;
+
+                    let inputEl;
+                    // ถ้าจำนวนตัวเลือกไม่เกิน 150 แบบ ให้ทำเป็น Dropdown เลือกกรอง
+                    if (sortedVals.length > 0 && sortedVals.length <= 150) {
+                        inputEl = document.createElement('select');
+                        inputEl.className = 'form-select form-select-sm col-filter';
+                        inputEl.dataset.colIndex = colIndex;
+
+                        const defaultOpt = document.createElement('option');
+                        defaultOpt.value = '';
+                        defaultOpt.textContent = `-- ทั้งหมด (${sortedVals.length}) --`;
+                        inputEl.appendChild(defaultOpt);
+
+                        sortedVals.forEach(v => {
+                            const opt = document.createElement('option');
+                            opt.value = v;
+                            opt.textContent = v;
+                            inputEl.appendChild(opt);
+                        });
+                    } else {
+                        // ถ้าตัวเลือกเยอะเกินไป ให้เป็นช่องค้นหาเฉพาะคอลัมน์
+                        inputEl = document.createElement('input');
+                        inputEl.type = 'text';
+                        inputEl.className = 'form-control form-control-sm col-filter';
+                        inputEl.placeholder = `ค้น ${header}...`;
+                        inputEl.dataset.colIndex = colIndex;
+                    }
+
+                    inputEl.addEventListener('change', applyAllFilters);
+                    inputEl.addEventListener('input', applyAllFilters);
+
+                    colDiv.appendChild(label);
+                    colDiv.appendChild(inputEl);
+                    dynamicFiltersContainer.appendChild(colDiv);
+                });
+
+                applyAllFilters();
+            }
+
+            // ฟังก์ชันกรองตารางตามเงื่อนไขทั้งหมด (Global Search + Column Filters)
+            function applyAllFilters() {
+                const activeTab = document.querySelector('.tab-pane.active');
+                if (!activeTab) return;
+
+                const table = activeTab.querySelector('table');
+                if (!table) return;
+
+                const globalFilter = (searchInput?.value || '').toLowerCase().trim();
+                const colFilters = Array.from(document.querySelectorAll('.col-filter'));
+
+                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                let visibleCount = 0;
+
                 rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(filter) ? '' : 'none';
+                    const cells = Array.from(row.querySelectorAll('td'));
+                    const rowText = row.textContent.toLowerCase();
+
+                    // 1. ตรวจสอบการค้นหารวม
+                    let matchGlobal = true;
+                    if (globalFilter && !rowText.includes(globalFilter)) {
+                        matchGlobal = false;
+                    }
+
+                    // 2. ตรวจสอบการกรองรายคอลัมน์
+                    let matchCols = true;
+                    if (matchGlobal) {
+                        for (let filterEl of colFilters) {
+                            const colIdx = parseInt(filterEl.dataset.colIndex);
+                            const filterVal = filterEl.value.trim().toLowerCase();
+                            
+                            if (filterVal !== '') {
+                                const cellVal = (cells[colIdx]?.textContent || '').trim().toLowerCase();
+                                if (filterEl.tagName === 'SELECT') {
+                                    if (cellVal !== filterVal) {
+                                        matchCols = false;
+                                        break;
+                                    }
+                                } else {
+                                    if (!cellVal.includes(filterVal)) {
+                                        matchCols = false;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    const isVisible = matchGlobal && matchCols;
+                    row.style.display = isVisible ? '' : 'none';
+                    if (isVisible) visibleCount++;
                 });
+
+                // อัปเดตจำนวนรายการที่ผ่านการกรอง
+                const infoEl = document.getElementById('rowCountInfo');
+                if (infoEl) {
+                    infoEl.textContent = `แสดง ${visibleCount.toLocaleString()} จาก ${rows.length.toLocaleString()} รายการ`;
+                }
             }
 
+            // ผูก Event ค้นหารวม
             if (searchInput) {
-                searchInput.addEventListener('keyup', filterTable);
-                searchInput.addEventListener('input', filterTable);
+                searchInput.addEventListener('keyup', applyAllFilters);
+                searchInput.addEventListener('input', applyAllFilters);
             }
 
-            if (clearBtn) {
-                clearBtn.addEventListener('click', function() {
-                    searchInput.value = '';
-                    filterTable();
+            // ผูก Event ปุ่มล้างตัวกรอง
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function() {
+                    if (searchInput) searchInput.value = '';
+                    document.querySelectorAll('.col-filter').forEach(f => f.value = '');
+                    applyAllFilters();
                 });
             }
 
-            // เมื่อเปลี่ยนแท็บ ให้กรองข้อมูลตามคำค้นปัจจุบันด้วย
+            // เมื่อสลับแท็บ ให้สร้างตัวกรองของแท็บนั้นๆ ใหม่ทันที
             const tabElList = document.querySelectorAll('button[data-bs-toggle="tab"]');
             tabElList.forEach(tabEl => {
                 tabEl.addEventListener('shown.bs.tab', function() {
-                    filterTable();
+                    buildColumnFilters();
                 });
             });
+
+            // สร้างตัวกรองครั้งแรกเมื่อโหลดหน้าเว็บสำเร็จ
+            buildColumnFilters();
         });
     </script>
 </body>
