@@ -1,13 +1,73 @@
-import os
-from flask import Flask, render_template, request
+from flask import Flask, render_template_string, request
 import pandas as pd
 import io
 
-# ระบุตำแหน่งโฟลเดอร์ templates แบบ Absolute Path สำหรับ Vercel
-base_dir = os.path.abspath(os.path.dirname(__file__))
-template_dir = os.path.join(base_dir, 'templates')
+app = Flask(__name__)
 
-app = Flask(__name__, template_folder=template_dir)
+# โค้ด HTML หน้าเว็บฝังไว้ในไฟล์เดียว
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Data Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h2 class="mb-4 text-primary font-weight-bold">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
+        
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" class="row g-3">
+                    <div class="col-auto">
+                        <input type="file" name="file" class="form-control" accept=".txt,.csv" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">อัปโหลดและแสดงผล</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        {% if tables %}
+            <ul class="nav nav-tabs" id="dataTabs" role="tablist">
+                {% for topic in tables.keys() %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                id="tab-{{ loop.index }}" 
+                                data-bs-toggle="tab" 
+                                data-bs-target="#content-{{ loop.index }}" 
+                                type="button" role="tab">
+                            {{ topic }}
+                        </button>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            <div class="tab-content bg-white p-3 border border-top-0 rounded-bottom shadow-sm" id="dataTabsContent">
+                {% for topic, table_html in tables.items() %}
+                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                         id="content-{{ loop.index }}" 
+                         role="tabpanel">
+                        <div class="table-responsive">
+                            {{ table_html | safe }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
 
 TOPICS = {
     "1. ข้อมูลส่วนบุคคลและอัตลักษณ์": [
@@ -57,7 +117,7 @@ def index():
             except Exception as e:
                 error = f"เกิดข้อผิดพลาดในการเปิดไฟล์: {str(e)}"
     
-    return render_template('index.html', tables=tables, error=error)
+    return render_template_string(HTML_TEMPLATE, tables=tables, error=error)
 
 if __name__ == '__main__':
     app.run(debug=True)
