@@ -15,11 +15,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Data Viewer - Full Data</title>
+    <title>HR Data Viewer - Full Data with Search</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .table-container {
-            max-height: 75vh;
+            max-height: 70vh;
             overflow: auto;
             border: 1px solid #dee2e6;
         }
@@ -69,6 +69,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {% endif %}
 
         {% if tables %}
+            <!-- ช่องค้นหาข้อมูลแบบ Instant Search -->
+            <div class="card mb-3 shadow-sm border-primary">
+                <div class="card-body bg-light py-2">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text bg-primary text-white fw-bold">🔍 ค้นหาข้อมูล</span>
+                                <input type="text" id="searchInput" class="form-control" placeholder="พิมพ์ค้นด้วยอะไรก็ได้ (ชื่อ, ID, ตำแหน่ง, แผนก, ที่อยู่ ฯลฯ)...">
+                                <button class="btn btn-outline-secondary" type="button" id="clearSearch">ล้างคำค้น</button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end text-muted small">
+                            ⚡ กรองข้อมูล Real-time ทุกคอลัมน์
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <ul class="nav nav-tabs" id="dataTabs" role="tablist">
                 {% for topic in tables.keys() %}
                     <li class="nav-item" role="presentation">
@@ -88,6 +106,45 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {% endif %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+
+            function filterTable() {
+                if (!searchInput) return;
+                const filter = searchInput.value.toLowerCase().trim();
+                const activeTab = document.querySelector('.tab-pane.active');
+                if (!activeTab) return;
+
+                const rows = activeTab.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(filter) ? '' : 'none';
+                });
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('keyup', filterTable);
+                searchInput.addEventListener('input', filterTable);
+            }
+
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function() {
+                    searchInput.value = '';
+                    filterTable();
+                });
+            }
+
+            // เมื่อเปลี่ยนแท็บ ให้กรองข้อมูลตามคำค้นปัจจุบันด้วย
+            const tabElList = document.querySelectorAll('button[data-bs-toggle="tab"]');
+            tabElList.forEach(tabEl => {
+                tabEl.addEventListener('shown.bs.tab', function() {
+                    filterTable();
+                });
+            });
+        });
+    </script>
 </body>
 </html>"""
 
