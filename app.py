@@ -15,7 +15,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Data Viewer - Full Filter System</title>
+    <title>HR Data Viewer - Full Filter with Age</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .table-container {
@@ -128,7 +128,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const resetBtn = document.getElementById('resetFiltersBtn');
             const dynamicFiltersContainer = document.getElementById('dynamicFilters');
 
-            // ฟังก์ชันสร้าง Dropdown/Input ตัวกรองตามคอลัมน์ของแท็บที่กำลังเปิดอยู่
             function buildColumnFilters() {
                 if (!dynamicFiltersContainer) return;
                 dynamicFiltersContainer.innerHTML = '';
@@ -146,7 +145,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const rows = Array.from(tbody.querySelectorAll('tr'));
 
                 headers.forEach((header, colIndex) => {
-                    // ดึงค่าทั้งหมดในคอลัมน์นั้นๆ เพื่อหา Unique Values
                     const uniqueValues = new Set();
                     rows.forEach(row => {
                         const cells = row.querySelectorAll('td');
@@ -156,7 +154,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         }
                     });
 
-                    const sortedVals = Array.from(uniqueValues).sort((a, b) => a.localeCompare(b, 'th'));
+                    const sortedVals = Array.from(uniqueValues).sort((a, b) => {
+                        const numA = parseFloat(a), numB = parseFloat(b);
+                        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                        return a.localeCompare(b, 'th');
+                    });
 
                     const colDiv = document.createElement('div');
                     colDiv.className = 'col-md-3 col-sm-6';
@@ -167,7 +169,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     label.textContent = header;
 
                     let inputEl;
-                    // ถ้าจำนวนตัวเลือกไม่เกิน 150 แบบ ให้ทำเป็น Dropdown เลือกกรอง
                     if (sortedVals.length > 0 && sortedVals.length <= 150) {
                         inputEl = document.createElement('select');
                         inputEl.className = 'form-select form-select-sm col-filter';
@@ -185,7 +186,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             inputEl.appendChild(opt);
                         });
                     } else {
-                        // ถ้าตัวเลือกเยอะเกินไป ให้เป็นช่องค้นหาเฉพาะคอลัมน์
                         inputEl = document.createElement('input');
                         inputEl.type = 'text';
                         inputEl.className = 'form-control form-control-sm col-filter';
@@ -204,7 +204,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 applyAllFilters();
             }
 
-            // ฟังก์ชันกรองตารางตามเงื่อนไขทั้งหมด (Global Search + Column Filters)
             function applyAllFilters() {
                 const activeTab = document.querySelector('.tab-pane.active');
                 if (!activeTab) return;
@@ -222,13 +221,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     const cells = Array.from(row.querySelectorAll('td'));
                     const rowText = row.textContent.toLowerCase();
 
-                    // 1. ตรวจสอบการค้นหารวม
                     let matchGlobal = true;
                     if (globalFilter && !rowText.includes(globalFilter)) {
                         matchGlobal = false;
                     }
 
-                    // 2. ตรวจสอบการกรองรายคอลัมน์
                     let matchCols = true;
                     if (matchGlobal) {
                         for (let filterEl of colFilters) {
@@ -257,20 +254,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (isVisible) visibleCount++;
                 });
 
-                // อัปเดตจำนวนรายการที่ผ่านการกรอง
                 const infoEl = document.getElementById('rowCountInfo');
                 if (infoEl) {
                     infoEl.textContent = `แสดง ${visibleCount.toLocaleString()} จาก ${rows.length.toLocaleString()} รายการ`;
                 }
             }
 
-            // ผูก Event ค้นหารวม
             if (searchInput) {
                 searchInput.addEventListener('keyup', applyAllFilters);
                 searchInput.addEventListener('input', applyAllFilters);
             }
 
-            // ผูก Event ปุ่มล้างตัวกรอง
             if (resetBtn) {
                 resetBtn.addEventListener('click', function() {
                     if (searchInput) searchInput.value = '';
@@ -279,7 +273,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 });
             }
 
-            // เมื่อสลับแท็บ ให้สร้างตัวกรองของแท็บนั้นๆ ใหม่ทันที
             const tabElList = document.querySelectorAll('button[data-bs-toggle="tab"]');
             tabElList.forEach(tabEl => {
                 tabEl.addEventListener('shown.bs.tab', function() {
@@ -287,7 +280,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 });
             });
 
-            // สร้างตัวกรองครั้งแรกเมื่อโหลดหน้าเว็บสำเร็จ
             buildColumnFilters();
         });
     </script>
@@ -296,7 +288,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 TOPICS = {
     "1. ข้อมูลส่วนบุคคลและอัตลักษณ์": [
-        'EmpID', 'Employee_Name', 'DOB', 'Sex', 'GenderID', 
+        'EmpID', 'Employee_Name', 'DOB', 'Age', 'Sex', 'GenderID', 
         'MarriedID', 'MaritalStatusID', 'MaritalDesc', 
         'CitizenDesc', 'HispanicLatino', 'RaceDesc'
     ],
@@ -330,6 +322,18 @@ def index():
                 content = file.stream.read().decode('utf-8', errors='ignore')
                 df = pd.read_csv(io.StringIO(content), sep=None, engine='python')
                 
+                # คำนวณอายุจาก DOB ถ้ามี DOB แต่ไม่มี Age
+                if 'DOB' in df.columns and 'Age' not in df.columns:
+                    try:
+                        dob_dt = pd.to_datetime(df['DOB'], errors='coerce')
+                        now = pd.Timestamp.now()
+                        # แก้ไขปีถ้าถูกตีความเกินปีปัจจุบัน (เช่น ปี ค.ศ. แบบ 2 หลัก)
+                        dob_dt = dob_dt.apply(lambda d: d.replace(year=d.year - 100) if pd.notnull(d) and d > now else d)
+                        ages = (now - dob_dt).dt.days // 365.25
+                        df['Age'] = ages.apply(lambda x: int(x) if pd.notnull(x) and x >= 0 else "-")
+                    except Exception:
+                        pass
+
                 for topic_name, cols in TOPICS.items():
                     valid_cols = [c for c in cols if c in df.columns]
                     if valid_cols:
