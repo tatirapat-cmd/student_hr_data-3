@@ -39,7 +39,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body class="bg-light">
     <div class="container-fluid px-4 py-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="text-primary fw-bold mb-0">📊 ระบบแสดงผลข้อมูลพนักงาน (แสดงผลข้อมูลทั้งหมด)</h2>
+            <h2 class="text-primary fw-bold mb-0">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
             {% if tables %}
                 <a href="/" class="btn btn-outline-danger">🗑️ ล้างข้อมูล / อัปโหลดใหม่</a>
             {% endif %}
@@ -130,8 +130,11 @@ def index():
                 for topic_name, cols in TOPICS.items():
                     valid_cols = [c for c in cols if c in df.columns]
                     if valid_cols:
-                        # แสดงผลคอลัมน์และทุกแถวทั้งหมด 100% โดยไม่จำกัดจำนวน
-                        tables[topic_name] = df[valid_cols].to_html(
+                        sub_df = df[valid_cols].copy()
+                        # แทรกคอลัมน์ "ลำดับ" เริ่มต้นที่ 1 ไว้ที่ตำแหน่งแรกสุด
+                        sub_df.insert(0, 'ลำดับ', range(1, len(sub_df) + 1))
+                        
+                        tables[topic_name] = sub_df.to_html(
                             classes='table table-striped table-hover table-bordered table-sm align-middle',
                             index=False,
                             max_rows=None,
