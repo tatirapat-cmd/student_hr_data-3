@@ -4,9 +4,7 @@ import io
 
 app = Flask(__name__)
 
-# โค้ด HTML หน้าเว็บฝังไว้ในไฟล์เดียว
-HTML_TEMPLATE = """
-<!DOCTYPE html>
+HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
@@ -16,8 +14,7 @@ HTML_TEMPLATE = """
 </head>
 <body class="bg-light">
     <div class="container py-5">
-        <h2 class="mb-4 text-primary font-weight-bold">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
-        
+        <h2 class="mb-4 text-primary fw-bold">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data" class="row g-3">
@@ -30,31 +27,20 @@ HTML_TEMPLATE = """
                 </form>
             </div>
         </div>
-
         {% if error %}
             <div class="alert alert-danger">{{ error }}</div>
         {% endif %}
-
         {% if tables %}
             <ul class="nav nav-tabs" id="dataTabs" role="tablist">
                 {% for topic in tables.keys() %}
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if loop.first %}active{% endif %}" 
-                                id="tab-{{ loop.index }}" 
-                                data-bs-toggle="tab" 
-                                data-bs-target="#content-{{ loop.index }}" 
-                                type="button" role="tab">
-                            {{ topic }}
-                        </button>
+                        <button class="nav-link {% if loop.first %}active{% endif %}" id="tab-{{ loop.index }}" data-bs-toggle="tab" data-bs-target="#content-{{ loop.index }}" type="button" role="tab">{{ topic }}</button>
                     </li>
                 {% endfor %}
             </ul>
-
             <div class="tab-content bg-white p-3 border border-top-0 rounded-bottom shadow-sm" id="dataTabsContent">
                 {% for topic, table_html in tables.items() %}
-                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
-                         id="content-{{ loop.index }}" 
-                         role="tabpanel">
+                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="content-{{ loop.index }}" role="tabpanel">
                         <div class="table-responsive">
                             {{ table_html | safe }}
                         </div>
@@ -63,11 +49,9 @@ HTML_TEMPLATE = """
             </div>
         {% endif %}
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html>
-"""
+</html>"""
 
 TOPICS = {
     "1. ข้อมูลส่วนบุคคลและอัตลักษณ์": [
