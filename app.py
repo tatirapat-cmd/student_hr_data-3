@@ -1,8 +1,13 @@
+import os
 from flask import Flask, render_template, request
 import pandas as pd
 import io
 
-app = Flask(__name__)
+# ระบุตำแหน่งโฟลเดอร์ templates แบบ Absolute Path สำหรับ Vercel
+base_dir = os.path.abspath(os.path.dirname(__file__))
+template_dir = os.path.join(base_dir, 'templates')
+
+app = Flask(__name__, template_folder=template_dir)
 
 TOPICS = {
     "1. ข้อมูลส่วนบุคคลและอัตลักษณ์": [
