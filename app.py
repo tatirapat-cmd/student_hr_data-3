@@ -14,22 +14,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body class="bg-light">
     <div class="container py-5">
-        <h2 class="mb-4 text-primary fw-bold">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-primary fw-bold mb-0">📊 ระบบแสดงผลข้อมูลพนักงาน (HR Data Viewer)</h2>
+            {% if tables %}
+                <a href="/" class="btn btn-outline-danger">🗑️ ล้างข้อมูล / อัปโหลดใหม่</a>
+            {% endif %}
+        </div>
+        
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
-                <form method="POST" enctype="multipart/form-data" class="row g-3">
-                    <div class="col-auto">
+                <form method="POST" enctype="multipart/form-data" class="row g-3 align-items-center">
+                    <div class="col-md-8">
                         <input type="file" name="file" class="form-control" accept=".txt,.csv" required>
                     </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary">อัปโหลดและแสดงผล</button>
+                    <div class="col-md-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary w-100">อัปโหลดและแสดงผล</button>
+                        {% if tables %}
+                            <a href="/" class="btn btn-secondary w-50">รีเซ็ต</a>
+                        {% endif %}
                     </div>
                 </form>
             </div>
         </div>
+
         {% if error %}
-            <div class="alert alert-danger">{{ error }}</div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ error }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         {% endif %}
+
         {% if tables %}
             <ul class="nav nav-tabs" id="dataTabs" role="tablist">
                 {% for topic in tables.keys() %}
